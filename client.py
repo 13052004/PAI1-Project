@@ -13,7 +13,7 @@ HOST = '127.0.0.1'
 PORT = 9000
 
 # Toggle: if True, use plain TCP (for local testing without TLS)
-USE_INSECURE_TESTING = False #Now using TLS
+USE_INSECURE_TESTING = True #Now using TLS
 # socket timeouts (seconds)
 CONNECT_TIMEOUT = 5.0
 RECV_TIMEOUT = 5.0

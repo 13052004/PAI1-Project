@@ -69,7 +69,8 @@ def init_db(path='pai1.db'):
                   from_acc TEXT,
                   to_acc TEXT,
                   amount REAL,
-                  ts INT
+                  ts INT,
+                  tx_mac TEXT
                )""")
     db.commit()
     #Initializes DB with existing user as requested 

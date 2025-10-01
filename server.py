@@ -159,21 +159,21 @@ def handle_tx(msg):
 def run_server(host=HOST, port=PORT):
     logger.info(f"Starting server on {host}:{port} (DB: {DB_PATH})")
     # Create TLS context
-    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    #context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     #Load certificate and key 
-    context.load_cert_chain(certfile="server.crt", keyfile="server.key")
+    #context.load_cert_chain(certfile="server.crt", keyfile="server.key")
     
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind((host, port))
         s.listen(5)
         #Wrap socket in server mode: it'll accept TLS conections
-        with context.wrap_socket(s, server_side=True) as tls_sock: #Comment this line to use TCP
-            logger.info("Server listening with TLS") #Comment this line to use TCP
-            while True:
-                conn, addr = tls_sock.accept() #s.accept() in TCP
-                t = threading.Thread(target=handle_client, args=(conn, addr), daemon=True)
-                t.start()
+        #with context.wrap_socket(s, server_side=True) as tls_sock: #Comment this line to use TCP
+            #logger.info("Server listening with TLS") #Comment this line to use TCP
+        while True:
+            conn, addr = s.accept()  #tls_sock.accept() 
+            t = threading.Thread(target=handle_client, args=(conn, addr), daemon=True)
+            t.start()
 
 if __name__ == "__main__":
     run_server()
