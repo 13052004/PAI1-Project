@@ -1,71 +1,59 @@
 #!/usr/bin/env python3
-import socket, ssl, json, time, binascii
-from client import register, login, send_tx, USE_INSECURE_TESTING
-from security_utils import payload_bytes, compute_hmac_hex
+"""
+Test: enviar dos veces la misma transacción (replay).
+La primera debe aceptarse, la segunda debe rechazarse con reason == "replay_detected".
+Funciona tanto en TCP como en TLS (usa la configuración de client.py).
+"""
 
-HOST = "127.0.0.1"
-PORT = 9000
+import sys
+import time
+import binascii
+
+from client import register, login, send_tx
+from security_utils import gen_nonce_hex
 
 def run():
     username = "carla"
     password = "secret"
 
-    print(f"Registering user: {username}")
+    print("Registering user:", username)
     print(register(username, password))
 
-    login_resp = login(username, password)
-    print("Login:", login_resp)
+    print("Logging in:")
+    res = login(username, password)
+    print(res)
+    if res.get("status") != "ok":
+        print("Login failed:", res)
+        return 1
 
-    if login_resp.get("status") != "ok":
-        print("Login failed, aborting.")
-        return
+    session_id = res["session_id"]
+    session_key = res["session_key"]
 
-    session_id = login_resp["session_id"]
-    session_key = login_resp["session_key"]
+    # Generamos nonce y timestamp fijos para ambos envíos
+    nonce = gen_nonce_hex()
+    ts = int(time.time())
 
-    # Send valid transaction
     print("Sending first tx (should succeed)")
-    resp1 = send_tx(session_id, session_key, "acc1", "acc2", 10.0)
-    print("Response:", resp1)
+    resp1 = send_tx(session_id, session_key, "ACC1", "ACC2", 5.0, nonce=nonce, ts=ts)
+    print("First tx response:", resp1)
+    if resp1.get("status") != "ok":
+        print("First TX failed unexpectedly; aborting test.")
+        return 2
 
-    # Try reusing the same playload (same nonce) 
-    payload = {
-        "from": "acc1",
-        "to": "acc2",
-        "amount": 10.0,
-        "nonce": resp1.get("txid", "fixednonce"),  # For simplicity, may also reuse nonce manually
-        "ts": int(time.time())
-    }
+    # Pequeña espera para evitar colisiones de orden de sockets (no estrictamente necesaria)
+    time.sleep(0.1)
 
-    
-    key = binascii.unhexlify(session_key)
-    mac = compute_hmac_hex(key, payload_bytes(
-        payload["from"], payload["to"], payload["amount"], payload["nonce"], payload["ts"]
-    ))
+    print("Replaying same tx (same nonce and ts) — should be rejected")
+    resp2 = send_tx(session_id, session_key, "ACC1", "ACC2", 5.0, nonce=nonce, ts=ts)
+    print("Second tx response (expected error):", resp2)
 
-    msg = {
-        "type": "tx",
-        "session_id": session_id,
-        "payload": payload,
-        "mac": mac
-    }
-
-    print("Replaying tx (should fail with replay_detected)")
-    if USE_INSECURE_TESTING:
-        with socket.create_connection((HOST, PORT)) as s:
-            s.sendall((json.dumps(msg) + "\n").encode())
-            data = s.recv(4096)
+    # Comprobación
+    if resp2.get("status") == "error" and resp2.get("reason") == "replay_detected":
+        print("Replay correctly detected.")
+        return 0
     else:
-        context = ssl.create_default_context()
-        context.check_hostname = False
-        context.verify_mode = ssl.CERT_NONE
-        with socket.create_connection((HOST, PORT)) as raw_sock:
-            with context.wrap_socket(raw_sock, server_hostname=HOST) as s:
-                s.sendall((json.dumps(msg) + "\n").encode())
-                data = s.recv(4096)
-
-    print("Server response to replayed tx:", data.decode().strip())
-
+        print("Replay NOT detected correctly! (unexpected response)")
+        return 3
 
 if __name__ == "__main__":
-    run()
+    sys.exit(run())
