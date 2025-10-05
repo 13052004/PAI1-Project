@@ -29,7 +29,7 @@ def run():
     session_id = res["session_id"]
     session_key = res["session_key"]
 
-    # Generamos nonce y timestamp fijos para ambos envíos
+    # Genera nonce y timestamp fijos para ambos envíos
     nonce = gen_nonce_hex()
     ts = int(time.time())
 
@@ -40,7 +40,7 @@ def run():
         print("First TX failed unexpectedly; aborting test.")
         return 2
 
-    # Pequeña espera para evitar colisiones de orden de sockets (no estrictamente necesaria)
+    # Espera para evitar colisiones 
     time.sleep(0.1)
 
     print("Replaying same tx (same nonce and ts) — should be rejected")
